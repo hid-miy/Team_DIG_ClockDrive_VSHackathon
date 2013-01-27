@@ -126,23 +126,36 @@ namespace ClockDrive
                 );
             RecordRoad.Text = this.Text;
 
-            // 親フォーム上の座標を記録し続ける
-            if (recordingHour >= 0)
+            using (var g = SUT.CreateGraphics())
             {
-                var pos = SUT.PointToClient(Cursor.Position);
-                if (!pos.Equals(recordRoad.roadPositions[recordRoad.roadPositions.Count - 1]))
-                    recordRoad.roadPositions.Add(pos);
-
-                using (var g = SUT.CreateGraphics())
+                if (recordingHour >= 0)
                 {
+                    // マウスポインタの位置を取得し、動いていれば、記録して、そこに丸を描く（静止していれば記録しない）
+                    var pos = SUT.PointToClient(Cursor.Position);
+                    if (recordRoad.roadPositions.Count > 0
+                        && !pos.Equals(recordRoad.roadPositions[recordRoad.roadPositions.Count - 1]))
+                    {
+                        recordRoad.roadPositions.Add(pos);
+                    }
                     var color = Color.FromArgb((int)(elapsed * 256 / intervalSeconds), 128, 255 - (int)(elapsed * 256 / intervalSeconds));
-                    var f = new Font("MS UI Gothic", 12);
-                    g.DrawString(string.Format("{0}→{1}", (int)recordingHour, (int)recordingHour + 1),
-                                 f, new SolidBrush(color), pos.X, pos.Y
-                                 );
+                    g.DrawEllipse(new Pen(Brushes.Red), (int)pos.X - 3, (int)pos.Y - 3, 6, 6);
 
-                    //TODO: ガイドラインとして、短針の現在角度を描く
+                    // ガイドラインとして、短針の現在角度を描く
+                    var angle = Math.PI * 2 * (-0.25 + Road.CalcPositionRatio(new DateTime(2000, 1, 1, (int)recordingHour, (int)(recordingHour * 60) % 60, 0)));
+                    g.DrawLine(Pens.DarkRed
+                                , SUT.Width / 2, SUT.Height / 2
+                                , (int)(SUT.Width / 2 + Math.Cos(angle) * 1000), (int)(SUT.Height / 2 + Math.Sin(angle) * 1000)
+                                );
+                }
 
+                // ガイドラインとして、０時～１２時の分割角度を描く
+                for (var h = 0; h < 12; h++)
+                {
+                    var next = Math.PI * 2 * (-0.25 + Road.CalcPositionRatio(new DateTime(2000, 1, 1, h, 0, 0)));
+                    g.DrawLine(Pens.Orange
+                                , SUT.Width / 2, SUT.Height / 2
+                                , (int)(SUT.Width / 2 + Math.Cos(next) * 1000), (int)(SUT.Height / 2 + Math.Sin(next) * 1000)
+                                );
                 }
             }
         }

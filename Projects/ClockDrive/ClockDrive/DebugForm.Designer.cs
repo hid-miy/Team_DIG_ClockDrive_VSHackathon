@@ -83,7 +83,7 @@
             this.RecordRoad.Name = "RecordRoad";
             this.RecordRoad.Size = new System.Drawing.Size(322, 78);
             this.RecordRoad.TabIndex = 4;
-            this.RecordRoad.Text = "●道の軌跡を記録する";
+            this.RecordRoad.Text = "[REC] 道の軌跡を記録する";
             this.RecordRoad.UseVisualStyleBackColor = true;
             this.RecordRoad.Click += new System.EventHandler(this.RecordRoad_Click);
             // 
