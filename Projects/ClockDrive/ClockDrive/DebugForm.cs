@@ -73,23 +73,29 @@ namespace ClockDrive
         /// </summary>
         private void RecordRoad_Click(object sender, EventArgs e)
         {
-            var instruction = string.Format(
-                "今から、マウスポインタの動きどおりに道の軌跡を記録します。"
-                + "\n■ OKをクリックした{0}秒後から、軌跡の記録が開始されます。"
-                + "\n■ つまり、{0}秒以内に'0時'にあたる位置にマウスポインタを置いてください。"
-                + "\n■ そして、{0}秒間かけて'0時'から'1時'にあたる位置まで動かしていってください。"
-                + "\n■ まず'0時'から'1時'の部分を記録し、その後は{0}秒ごとに、'1時'から'2時'の部分、'2時'から'3時'の部分、と移っていきます。"
-                + "\n■ '11時'から'12時'の部分を記録し終わったら、道の軌跡が出来上がります。",
-                intervalSeconds
-                );
-            var result = MessageBox.Show(instruction, "道の軌跡を、手動で記録する", MessageBoxButtons.OKCancel);
-            if (result == System.Windows.Forms.DialogResult.Cancel) return;
+            if (timer1.Enabled)
+            {
+                timer1.Enabled = false;
+                SUT.Draw(DateTime.Now);
+            }
+            else
+            {
+                var instruction = string.Format(
+                    "今から、マウスポインタの動きどおりに道の軌跡を記録します。"
+                    + "\n■ OKをクリックした{0}秒後から、軌跡の記録が開始されます。"
+                    + "\n■ {0}秒以内に'0時'にあたる位置にマウスポインタを置いてください。"
+                    + "\n■ そして、{0}秒間かけて'0時'から'1時'にあたる位置まで動かしてください。"
+                    + "\n■ その後は{0}秒ごとに、'1時'から'2時'の部分、'2時'から'3時'の部分、・・・"
+                    + "\n■ '11時'から'12時'の部分を記録し終わったら、道の軌跡が出来上がります。",
+                    intervalSeconds
+                    );
+                var result = MessageBox.Show(instruction, "道の軌跡を、手動で記録する", MessageBoxButtons.OKCancel);
+                if (result == System.Windows.Forms.DialogResult.Cancel) return;
 
-            //TODO: ガイドラインとして、中心から１２等分する放射線を描く
-
-            timer1.Enabled = true;
-            recordStarted = DateTime.Now;
-            recordRoad.roadPositions.Clear();
+                timer1.Enabled = true;
+                recordStarted = DateTime.Now;
+                recordRoad.roadPositions.Clear();
+            }
         }
 
         /// <summary>
@@ -104,12 +110,29 @@ namespace ClockDrive
             {
                 timer1.Enabled = false;
 
-                //TODO: 動きノイズ低減のため、ローパスフィルタを適用する（過去５回ぶんのサンプルで平滑化する）
+                // 動きノイズ低減のため、ローパスフィルタを適用する（前後ｎ回ぶんのサンプルで平滑化する）
+                const int FilterSamples = 2;
+                var filteredPositions = new List<PointF>();
+                for (var idx = 0; idx < recordRoad.roadPositions.Count; idx++)
+                {
+                    var tempPos = new PointF();
+                    // 前後ｎ回ぶんのサンプルの平均位置を得る
+                    for (var diff = -FilterSamples; diff <= FilterSamples; diff++)
+                    {
+                        var idxDiff = (idx + diff + recordRoad.roadPositions.Count) % recordRoad.roadPositions.Count;
+                        tempPos.X += recordRoad.roadPositions[idxDiff].X;
+                        tempPos.Y += recordRoad.roadPositions[idxDiff].Y;
+                    }
+                    tempPos.X /= FilterSamples;
+                    tempPos.Y /= FilterSamples;
+
+                    filteredPositions.Add(tempPos);
+                }
 
                 var exportFilePath = Application.StartupPath + string.Format(@"\datas\RoadData.{0}.csv", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
                 using (var writer = new StreamWriter(exportFilePath))
                 {
-                    foreach(var pos in recordRoad.roadPositions)
+                    foreach (var pos in filteredPositions)
                     {
                         writer.WriteLine(string.Format("{0},{1}", pos.X, pos.Y));
                     }
@@ -132,8 +155,8 @@ namespace ClockDrive
                 {
                     // マウスポインタの位置を取得し、動いていれば、記録して、そこに丸を描く（静止していれば記録しない）
                     var pos = SUT.PointToClient(Cursor.Position);
-                    if (recordRoad.roadPositions.Count > 0
-                        && !pos.Equals(recordRoad.roadPositions[recordRoad.roadPositions.Count - 1]))
+                    if (recordRoad.roadPositions.Count == 0
+                        || !pos.Equals(recordRoad.roadPositions[recordRoad.roadPositions.Count - 1]))
                     {
                         recordRoad.roadPositions.Add(pos);
                     }
